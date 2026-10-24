@@ -58,3 +58,57 @@ if (await Task.WhenAny(heartbeat, Task.Delay(3000, cts.Token)) != heartbeat)
 等 CX 回复的是 COM 线程，UI 线程只 `await` 结果，等待期间照常处理拖动和绘制。CX 卡死时，卡住的也只是 COM 线程，看门狗还能通过超时检测出来。
 
 **规则：凡是用到 `_cx` 或 `_approach` 的调用（包括 `Marshal.FinalReleaseComObject`），都写在 `_com.Run(...)` 里。**
+
+## 心跳用 `Version`，不要用 `IsStartingUp()`
+
+### 现象
+
+COM 调用移到独立的 STA 线程后，我们自己的窗口不卡了，但开着看门狗拖动 **CX 的窗口**时，CX 会卡。
+
+### 测试
+
+看门狗每秒心跳一次，用 `Check IsStartingUp` 和 `Check Version` 两个开关分别控制调用哪个方法，然后拖动 CX 的窗口：
+
+| 心跳调用 | CX 窗口拖动 |
+|---|---|
+| `IsStartingUp()` | 卡 |
+| `Version` | 不卡 |
+
+### 原因
+
+CX 的 COM 对象运行在 **CX 自己的 UI 线程**上。我们每发一次 COM 调用，都要占用一次 CX 的 UI 线程，而这个线程同时负责 CX 窗口的拖动和绘制：
+
+```
+我们的 COM 线程 ──IsStartingUp()──▶ CX 的 UI 线程（同时负责 CX 的窗口拖动、绘制）
+```
+
+`IsStartingUp()` 在 CX 内部要做实际的工作，大概率会去查询控制器的状态，每次都要占用一段时间，所以 CX 的窗口每秒卡一下；`Version` 只是读取一个属性值，几乎不占时间。
+
+### 结论
+
+- 定期轮询 CX 时（比如看门狗心跳），优先读 `Version` 这类轻量的属性。
+- `IsStartingUp()` 只在 Open 之后等待 CX 启动完成时用。
+- 不管我们这边怎么写，每次 COM 调用都会占用 CX 的 UI 线程，所以调用频率要控制住。
+
+### 只读 `Version`，怎么知道 CX 是不是启动中
+
+问题：CX 启动中也能读到版本号，所以 `Version` 判断不了 CX 是否启动完成；而 `IsStartingUp()` 又会让 CX 卡顿。
+
+关键在于：**“启动中”是一次性的状态。** CX 每次启动只经历一次，启动完成后不会再回到启动中。所以两个方法各管一段：
+
+| 阶段 | 用什么检查 | 原因 |
+|---|---|---|
+| 连接时，等待 CX 启动完成 | `IsStartingUp()` | 只有它能判断启动是否完成。这段时间 CX 本来就在启动，卡一点没关系 |
+| 启动完成后，看门狗心跳 | `Version` | 只需要确认连接还活着，读版本号就够了，不会卡 |
+
+为什么之后不用再检查“启动中”：CX 要回到启动中，只能是退出后重新启动。CX 一退出，旧的 COM 连接就失效了：
+
+1. 心跳读 `Version` 抛出 COM 异常（比如 `RPC_E_DISCONNECTED`）；
+2. 看门狗释放引用，显示“连接已断开”；
+3. 自动重连调用 `ConnectAsync()`，又会用 `IsStartingUp()` 等 CX 启动完成。
+
+这依赖一条规则：**`_cx` 不为 null，就代表 CX 已经启动完成。** 所以：
+
+- `_cx` 只由 `ConnectAsync()` 赋值，而且要等 `IsStartingUp()` 返回 false 之后才赋值；
+- 等待启动期间，新建的连接只放在局部变量 `cx` 里。如果先赋值给 `_cx` 再等待，看门狗就会在 CX 还没启动完成时读到 `Version`，误报“已连接”；
+- 等待启动超时或出错时，`ConnectAsync()` 自己释放局部变量 `cx`，`_cx` 保持不变。
