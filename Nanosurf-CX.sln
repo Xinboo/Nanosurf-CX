@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37328.6 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nanosurf-CX.WinFormsApp", "Nanosurf-CX.WinFormsApp\Nanosurf-CX.WinFormsApp.csproj", "{31CBB4AB-5AE2-48B1-977A-7A1F190B5394}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{31CBB4AB-5AE2-48B1-977A-7A1F190B5394}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31CBB4AB-5AE2-48B1-977A-7A1F190B5394}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31CBB4AB-5AE2-48B1-977A-7A1F190B5394}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31CBB4AB-5AE2-48B1-977A-7A1F190B5394}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E1CF4139-7F2D-473B-BF0D-4E714753823E}
+	EndGlobalSection
+EndGlobal
